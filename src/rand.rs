@@ -94,6 +94,7 @@ impl SecureRandom for SystemRandom {
 impl sealed::Sealed for SystemRandom {}
 
 #[cfg(any(
+    target_os = "android",
     all(target_os = "linux", not(feature = "dev_urandom_fallback")),
     windows
 ))]
@@ -110,7 +111,7 @@ use self::fuchsia::fill as fill_impl;
 
 use crate::sealed;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 mod sysrand_chunk {
     use crate::error;
     use libc::{self, size_t};
@@ -170,7 +171,7 @@ mod sysrand_chunk {
     }
 }
 
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(any(target_os = "android", target_os = "linux", windows))]
 mod sysrand {
     use super::sysrand_chunk::chunk;
     use crate::error;
