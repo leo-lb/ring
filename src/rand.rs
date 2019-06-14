@@ -137,7 +137,19 @@ mod sysrand_chunk {
         let chunk_len: size_t = dest.len();
         let r = unsafe { libc::syscall(SYS_GETRANDOM, dest.as_mut_ptr(), chunk_len, 0) };
         if r < 0 {
-            if unsafe { *libc::__errno_location() } == libc::EINTR {
+            let errno;
+
+            #[cfg(target_os = "linux")]
+            {
+                errno = unsafe { *libc::__errno_location() };
+            }
+
+            #[cfg(target_os = "android")]
+            {
+                errno = unsafe { *libc::__errno() };
+            }
+
+            if errno == libc::EINTR {
                 // If an interrupt occurs while getrandom() is blocking to wait
                 // for the entropy pool, then EINTR is returned. Returning 0
                 // will cause the caller to try again.
