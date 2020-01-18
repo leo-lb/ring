@@ -17,20 +17,17 @@ use super::{
     nonce::{self, Iv},
     Block, BLOCK_LEN,
 };
-use crate::{endian::*, polyfill::convert::*};
-use core;
-use libc::size_t;
+use crate::{c, endian::*, polyfill::convert::*};
 
 #[repr(C)]
 pub struct Key([Block; KEY_BLOCKS]);
 
-impl From<&'_ [u8; KEY_LEN]> for Key {
-    fn from(value: &[u8; KEY_LEN]) -> Self {
+impl Key {
+    #[inline]
+    pub fn from(value: &[u8; KEY_LEN]) -> Self {
         Self(<[Block; KEY_BLOCKS]>::from_(value))
     }
-}
 
-impl Key {
     #[inline] // Optimize away match on `counter`.
     pub fn encrypt_in_place(&self, counter: Counter, in_out: &mut [u8]) {
         unsafe {
@@ -121,9 +118,9 @@ impl Key {
             fn GFp_ChaCha20_ctr32(
                 out: *mut u8,
                 in_: *const u8,
-                in_len: size_t,
-                key: &[u32; 8],
-                first_iv: &[u32; 4],
+                in_len: c::size_t,
+                key: &Key,
+                first_iv: &Iv,
             );
         }
 
@@ -133,14 +130,20 @@ impl Key {
         if cfg!(target_endian = "big") {
             // input key and counter are little endian
             let key: [u32; 8] = [
-                u32::from_le(key[0]), u32::from_le(key[1]),
-                u32::from_le(key[2]), u32::from_le(key[3]),
-                u32::from_le(key[4]), u32::from_le(key[5]),
-                u32::from_le(key[6]), u32::from_le(key[7])
+                u32::from_le(key[0]),
+                u32::from_le(key[1]),
+                u32::from_le(key[2]),
+                u32::from_le(key[3]),
+                u32::from_le(key[4]),
+                u32::from_le(key[5]),
+                u32::from_le(key[6]),
+                u32::from_le(key[7]),
             ];
             let ctr: [u32; 4] = [
-                u32::from_le(ctr[0]), u32::from_le(ctr[1]),
-                u32::from_le(ctr[2]), u32::from_le(ctr[3])
+                u32::from_le(ctr[0]),
+                u32::from_le(ctr[1]),
+                u32::from_le(ctr[2]),
+                u32::from_le(ctr[3]),
             ];
             GFp_ChaCha20_ctr32(output, input, in_out_len, &key, &ctr);
         } else {
@@ -163,6 +166,8 @@ pub const KEY_LEN: usize = KEY_BLOCKS * BLOCK_LEN;
 mod tests {
     use super::*;
     use crate::test;
+    use alloc::vec;
+    use core::convert::TryInto;
 
     // This verifies the encryption functionality provided by ChaCha20_ctr32
     // is successful when either computed on disjoint input/output buffers,
@@ -180,7 +185,7 @@ mod tests {
             assert_eq!(section, "");
 
             let key = test_case.consume_bytes("Key");
-            let key: &[u8; KEY_LEN] = key.as_slice().try_into_()?;
+            let key: &[u8; KEY_LEN] = key.as_slice().try_into()?;
             let key = Key::from(key);
 
             let ctr = test_case.consume_usize("Ctr");

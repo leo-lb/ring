@@ -15,7 +15,6 @@
 #![forbid(
     anonymous_parameters,
     box_pointers,
-    legacy_directory_ownership,
     missing_copy_implementations,
     missing_debug_implementations,
     missing_docs,
@@ -31,7 +30,7 @@
     warnings
 )]
 
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "alloc")]
 use ring::{
     error,
     io::der,
@@ -40,14 +39,12 @@ use ring::{
     test, test_file,
 };
 
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "alloc")]
 #[test]
 fn rsa_from_pkcs8_test() {
     test::run(
         test_file!("rsa_from_pkcs8_tests.txt"),
         |section, test_case| {
-            use std::error::Error;
-
             assert_eq!(section, "");
 
             let input = test_case.consume_bytes("Input");
@@ -57,7 +54,7 @@ fn rsa_from_pkcs8_test() {
                 (Ok(_), None) => (),
                 (Err(e), None) => panic!("Failed with error \"{}\", but expected to succeed", e),
                 (Ok(_), Some(e)) => panic!("Succeeded, but expected error \"{}\"", e),
-                (Err(actual), Some(expected)) => assert_eq!(actual.description(), expected),
+                (Err(actual), Some(expected)) => assert_eq!(format!("{}", actual), expected),
             };
 
             Ok(())
@@ -65,7 +62,7 @@ fn rsa_from_pkcs8_test() {
     );
 }
 
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "alloc")]
 #[test]
 fn test_signature_rsa_pkcs1_sign() {
     let rng = rand::SystemRandom::new();
@@ -93,7 +90,6 @@ fn test_signature_rsa_pkcs1_sign() {
                 return Ok(());
             }
             let key_pair = key_pair.unwrap();
-            let key_pair = std::sync::Arc::new(key_pair);
 
             // XXX: This test is too slow on Android ARM Travis CI builds.
             // TODO: re-enable these tests on Android ARM.
@@ -107,7 +103,7 @@ fn test_signature_rsa_pkcs1_sign() {
     );
 }
 
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "alloc")]
 #[test]
 fn test_signature_rsa_pss_sign() {
     test::run(
@@ -144,7 +140,7 @@ fn test_signature_rsa_pss_sign() {
     );
 }
 
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "alloc")]
 #[test]
 fn test_signature_rsa_pkcs1_verify() {
     test::run(
@@ -154,7 +150,7 @@ fn test_signature_rsa_pkcs1_verify() {
 
             let digest_name = test_case.consume_string("Digest");
             let alg = match digest_name.as_ref() {
-                "SHA1" => &signature::RSA_PKCS1_2048_8192_SHA1,
+                "SHA1" => &signature::RSA_PKCS1_2048_8192_SHA1_FOR_LEGACY_USE_ONLY,
                 "SHA256" => &signature::RSA_PKCS1_2048_8192_SHA256,
                 "SHA384" => &signature::RSA_PKCS1_2048_8192_SHA384,
                 "SHA512" => &signature::RSA_PKCS1_2048_8192_SHA512,
@@ -187,22 +183,12 @@ fn test_signature_rsa_pkcs1_verify() {
                 signature::UnparsedPublicKey::new(alg, &public_key).verify(&msg, &sig);
             assert_eq!(actual_result.is_ok(), is_valid);
 
-            // Deprecated API.
-            #[allow(deprecated)]
-            let actual_result = signature::verify(
-                alg,
-                untrusted::Input::from(&public_key),
-                untrusted::Input::from(&msg),
-                untrusted::Input::from(&sig),
-            );
-            assert_eq!(actual_result.is_ok(), is_valid);
-
             Ok(())
         },
     );
 }
 
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "alloc")]
 #[test]
 fn test_signature_rsa_pss_verify() {
     test::run(
@@ -244,15 +230,6 @@ fn test_signature_rsa_pss_verify() {
                 signature::UnparsedPublicKey::new(alg, &public_key).verify(&msg, &sig);
             assert_eq!(actual_result.is_ok(), is_valid);
 
-            #[allow(deprecated)]
-            let actual_result = signature::verify(
-                alg,
-                untrusted::Input::from(&public_key),
-                untrusted::Input::from(&msg),
-                untrusted::Input::from(&sig),
-            );
-            assert_eq!(actual_result.is_ok(), is_valid);
-
             Ok(())
         },
     );
@@ -260,7 +237,7 @@ fn test_signature_rsa_pss_verify() {
 
 // Test for `primitive::verify()`. Read public key parts from a file
 // and use them to verify a signature.
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "alloc")]
 #[test]
 fn test_signature_rsa_primitive_verification() {
     test::run(
@@ -280,7 +257,7 @@ fn test_signature_rsa_primitive_verification() {
     )
 }
 
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "alloc")]
 #[test]
 fn rsa_test_public_key_coverage() {
     const PRIVATE_KEY: &[u8] = include_bytes!("rsa_test_private_key_2048.p8");

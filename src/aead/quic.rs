@@ -18,9 +18,9 @@
 
 use crate::{
     aead::{aes, block::Block, chacha},
-    cpu, error,
-    polyfill::convert::*,
+    cpu, error, hkdf,
 };
+use core::convert::{TryFrom, TryInto};
 
 /// A key for generating QUIC Header Protection masks.
 pub struct HeaderProtectionKey {
@@ -32,6 +32,16 @@ pub struct HeaderProtectionKey {
 enum KeyInner {
     Aes(aes::Key),
     ChaCha20(chacha::Key),
+}
+
+impl From<hkdf::Okm<'_, &'static Algorithm>> for HeaderProtectionKey {
+    fn from(okm: hkdf::Okm<&'static Algorithm>) -> Self {
+        let mut key_bytes = [0; super::MAX_KEY_LEN];
+        let algorithm = *okm.len();
+        let key_bytes = &mut key_bytes[..algorithm.key_len()];
+        okm.fill(key_bytes).unwrap();
+        Self::new(algorithm, key_bytes).unwrap()
+    }
 }
 
 impl HeaderProtectionKey {
@@ -52,7 +62,7 @@ impl HeaderProtectionKey {
     ///
     /// `sample` must be exactly `self.algorithm().sample_len()` bytes long.
     pub fn new_mask(&self, sample: &[u8]) -> Result<[u8; 5], error::Unspecified> {
-        let sample = <&[u8; SAMPLE_LEN]>::try_from_(sample)?;
+        let sample = <&[u8; SAMPLE_LEN]>::try_from(sample)?;
         let sample = Block::from(sample);
 
         let out = (self.algorithm.new_mask)(&self.inner, sample);
@@ -76,6 +86,13 @@ pub struct Algorithm {
 
     key_len: usize,
     id: AlgorithmID,
+}
+
+impl hkdf::KeyType for &'static Algorithm {
+    #[inline]
+    fn len(&self) -> usize {
+        self.key_len()
+    }
 }
 
 impl Algorithm {
@@ -153,7 +170,7 @@ pub static CHACHA20: Algorithm = Algorithm {
 };
 
 fn chacha20_init(key: &[u8], _todo: cpu::Features) -> Result<KeyInner, error::Unspecified> {
-    let chacha20_key: &[u8; chacha::KEY_LEN] = key.try_into_()?;
+    let chacha20_key: &[u8; chacha::KEY_LEN] = key.try_into()?;
     Ok(KeyInner::ChaCha20(chacha::Key::from(chacha20_key)))
 }
 

@@ -14,12 +14,10 @@
 
 //! Error reporting.
 
-use crate::polyfill::convert::*;
-use core;
 use untrusted;
 
-#[cfg(feature = "use_heap")]
-use std;
+#[cfg(feature = "std")]
+extern crate std;
 
 /// An error with absolutely no details.
 ///
@@ -41,7 +39,7 @@ use std;
 /// enum Error {
 ///     CryptoError,
 ///
-/// #  #[cfg(feature = "use_heap")]
+/// #  #[cfg(feature = "alloc")]
 ///     IOError(std::io::Error),
 ///     // [...]
 /// }
@@ -93,10 +91,10 @@ impl core::fmt::Display for Unspecified {
     }
 }
 
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "std")]
 impl std::error::Error for Unspecified {
     #[inline]
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         None
     }
 
@@ -111,8 +109,8 @@ impl From<untrusted::EndOfInput> for Unspecified {
     }
 }
 
-impl From<TryFromSliceError> for Unspecified {
-    fn from(_: TryFromSliceError) -> Self {
+impl From<core::array::TryFromSliceError> for Unspecified {
+    fn from(_: core::array::TryFromSliceError) -> Self {
         Unspecified
     }
 }
@@ -173,12 +171,12 @@ impl KeyRejected {
         KeyRejected("PublicKeyIsMissing")
     }
 
-    #[cfg(feature = "use_heap")]
+    #[cfg(feature = "alloc")]
     pub(crate) fn too_small() -> Self {
         KeyRejected("TooSmall")
     }
 
-    #[cfg(feature = "use_heap")]
+    #[cfg(feature = "alloc")]
     pub(crate) fn too_large() -> Self {
         KeyRejected("TooLarge")
     }
@@ -191,7 +189,7 @@ impl KeyRejected {
         KeyRejected("WrongAlgorithm")
     }
 
-    #[cfg(feature = "use_heap")]
+    #[cfg(feature = "alloc")]
     pub(crate) fn private_modulus_len_not_multiple_of_512_bits() -> Self {
         KeyRejected("PrivateModulusLenNotMultipleOf512Bits")
     }
@@ -201,9 +199,9 @@ impl KeyRejected {
     }
 }
 
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "std")]
 impl std::error::Error for KeyRejected {
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         None
     }
 
@@ -212,8 +210,7 @@ impl std::error::Error for KeyRejected {
     }
 }
 
-#[cfg(feature = "use_heap")]
-impl std::fmt::Display for KeyRejected {
+impl core::fmt::Display for KeyRejected {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         f.write_str(self.description_())
     }

@@ -27,13 +27,11 @@
 //
 // The field functions are shared by Ed25519 and X25519 where possible.
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
 #pragma warning(push, 3)
 #endif
 
-#include <string.h>
-
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
 #pragma warning(pop)
 #endif
 
@@ -42,7 +40,7 @@
 #include "internal.h"
 #include "../../crypto/internal.h"
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
 // '=': conversion from 'int64_t' to 'int32_t', possible loss of data
 #pragma warning(disable: 4242)
 // '=': conversion from 'int32_t' to 'uint8_t', possible loss of data
@@ -66,8 +64,6 @@
 #include "./curve25519_32.h"
 #endif  // BORINGSSL_CURVE25519_64BIT
 
-
-void GFp_x25519_sc_mask(uint8_t a[32]);
 
 // Low-level intrinsic operations
 
@@ -93,9 +89,6 @@ static uint64_t load_4(const uint8_t *in) {
 
 #if defined(BORINGSSL_CURVE25519_64BIT)
 
-typedef uint64_t fe_limb_t;
-#define FE_NUM_LIMBS 5
-
 // assert_fe asserts that |f| satisfies bounds:
 //
 //  [[0x0 ~> 0x8cccccccccccc],
@@ -109,7 +102,7 @@ typedef uint64_t fe_limb_t;
 #define assert_fe(f)                                                    \
   do {                                                                  \
     for (unsigned _assert_fe_i = 0; _assert_fe_i < 5; _assert_fe_i++) { \
-      assert(f[_assert_fe_i] <= UINT64_C(0x8cccccccccccc));             \
+      ASSERT(f[_assert_fe_i] <= UINT64_C(0x8cccccccccccc));             \
     }                                                                   \
   } while (0)
 
@@ -126,14 +119,11 @@ typedef uint64_t fe_limb_t;
 #define assert_fe_loose(f)                                              \
   do {                                                                  \
     for (unsigned _assert_fe_i = 0; _assert_fe_i < 5; _assert_fe_i++) { \
-      assert(f[_assert_fe_i] <= UINT64_C(0x1a666666666664));            \
+      ASSERT(f[_assert_fe_i] <= UINT64_C(0x1a666666666664));            \
     }                                                                   \
   } while (0)
 
 #else
-
-typedef uint32_t fe_limb_t;
-#define FE_NUM_LIMBS 10
 
 // assert_fe asserts that |f| satisfies bounds:
 //
@@ -148,7 +138,7 @@ typedef uint32_t fe_limb_t;
 #define assert_fe(f)                                                     \
   do {                                                                   \
     for (unsigned _assert_fe_i = 0; _assert_fe_i < 10; _assert_fe_i++) { \
-      assert(f[_assert_fe_i] <=                                          \
+      ASSERT(f[_assert_fe_i] <=                                          \
              ((_assert_fe_i & 1) ? 0x2333333u : 0x4666666u));            \
     }                                                                    \
   } while (0)
@@ -166,7 +156,7 @@ typedef uint32_t fe_limb_t;
 #define assert_fe_loose(f)                                               \
   do {                                                                   \
     for (unsigned _assert_fe_i = 0; _assert_fe_i < 10; _assert_fe_i++) { \
-      assert(f[_assert_fe_i] <=                                          \
+      ASSERT(f[_assert_fe_i] <=                                          \
              ((_assert_fe_i & 1) ? 0x6999999u : 0xd333332u));            \
     }                                                                    \
   } while (0)
@@ -178,14 +168,14 @@ OPENSSL_STATIC_ASSERT(sizeof(fe) == sizeof(fe_limb_t) * FE_NUM_LIMBS,
 
 static void fe_frombytes_strict(fe *h, const uint8_t s[32]) {
   // |fiat_25519_from_bytes| requires the top-most bit be clear.
-  assert((s[31] & 0x80) == 0);
+  ASSERT((s[31] & 0x80) == 0);
   fiat_25519_from_bytes(h->v, s);
   assert_fe(h->v);
 }
 
 static void fe_frombytes(fe *h, const uint8_t s[32]) {
   uint8_t s_copy[32];
-  memcpy(s_copy, s, 32);
+  bytes_copy(s_copy, s, 32);
   s_copy[31] &= 0x7f;
   fe_frombytes_strict(h, s_copy);
 }
@@ -197,21 +187,21 @@ static void fe_tobytes(uint8_t s[32], const fe *f) {
 
 // h = 0
 static void fe_0(fe *h) {
-  memset(h, 0, sizeof(fe));
+  fe_limbs_zero(h->v);
 }
 
 static void fe_loose_0(fe_loose *h) {
-  memset(h, 0, sizeof(fe_loose));
+  fe_limbs_zero(h->v);
 }
 
 // h = 1
 static void fe_1(fe *h) {
-  memset(h, 0, sizeof(fe));
+  fe_0(h);
   h->v[0] = 1;
 }
 
 static void fe_loose_1(fe_loose *h) {
-  memset(h, 0, sizeof(fe_loose));
+  fe_loose_0(h);
   h->v[0] = 1;
 }
 
@@ -333,17 +323,15 @@ static void fe_cmov(fe_loose *f, const fe_loose *g, fe_limb_t b) {
 
 // h = f
 static void fe_copy(fe *h, const fe *f) {
-  memmove(h, f, sizeof(fe));
+  fe_limbs_copy(h->v, f->v);
 }
 
 static void fe_copy_lt(fe_loose *h, const fe *f) {
-  OPENSSL_STATIC_ASSERT(sizeof(fe_loose) == sizeof(fe),
-                        "fe and fe_loose mismatch");
-  memmove(h, f, sizeof(fe));
+  fe_limbs_copy(h->v, f->v);
 }
 #if !defined(OPENSSL_SMALL)
 static void fe_copy_ll(fe_loose *h, const fe_loose *f) {
-  memmove(h, f, sizeof(fe_loose));
+  fe_limbs_copy(h->v, f->v);
 }
 #endif // !defined(OPENSSL_SMALL)
 
@@ -1803,15 +1791,14 @@ static void sc_muladd(uint8_t *s, const uint8_t *a, const uint8_t *b,
 }
 
 
-void GFp_x25519_scalar_mult_generic(uint8_t out[32],
-                                    const uint8_t scalar[32],
-                                    const uint8_t point[32]) {
+void GFp_x25519_scalar_mult_generic_masked(uint8_t out[32],
+                                           const uint8_t scalar_masked[32],
+                                           const uint8_t point[32]) {
   fe x1, x2, z2, x3, z3, tmp0, tmp1;
   fe_loose x2l, z2l, x3l, tmp0l, tmp1l;
 
   uint8_t e[32];
-  memcpy(e, scalar, 32);
-  GFp_x25519_sc_mask(e);
+  bytes_copy(e, scalar_masked, 32);
   // The following implementation was transcribed to Coq and proven to
   // correspond to unary scalar multiplication in affine coordinates given that
   // x1 != 0 is the x coordinate of some point on the curve. It was also checked
@@ -1882,11 +1869,10 @@ void GFp_x25519_scalar_mult_generic(uint8_t out[32],
   fe_tobytes(out, &x2);
 }
 
-void GFp_x25519_public_from_private_generic(uint8_t out_public_value[32],
-                                            const uint8_t private_key[32]) {
+void GFp_x25519_public_from_private_generic_masked(uint8_t out_public_value[32],
+                                                   const uint8_t private_key_masked[32]) {
   uint8_t e[32];
-  memcpy(e, private_key, 32);
-  GFp_x25519_sc_mask(e);
+  bytes_copy(e, private_key_masked, 32);
 
   ge_p3 A;
   GFp_x25519_ge_scalarmult_base(&A, e);

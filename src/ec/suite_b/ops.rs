@@ -12,9 +12,8 @@
 // OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 // CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-use crate::{arithmetic::montgomery::*, error, limb::*};
+use crate::{arithmetic::montgomery::*, c, error, limb::*};
 use core::marker::PhantomData;
-use libc::size_t;
 use untrusted;
 
 pub use self::elem::*;
@@ -119,7 +118,7 @@ macro_rules! limbs {
 }
 
 static ONE: Elem<Unencoded> = Elem {
-    limbs: limbs![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    limbs: limbs![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     m: PhantomData,
     encoding: PhantomData,
 };
@@ -499,7 +498,7 @@ extern "C" {
         a: *const Limb,
         b: *const Limb,
         m: *const Limb,
-        num_limbs: size_t,
+        num_limbs: c::size_t,
     );
 }
 
@@ -507,7 +506,7 @@ extern "C" {
 mod tests {
     use super::*;
     use crate::test;
-    use std;
+    use alloc::{format, vec, vec::Vec};
     use untrusted;
 
     const ZERO_SCALAR: Scalar = Scalar {
@@ -1182,12 +1181,11 @@ mod tests {
     ) {
         for i in 0..ops.num_limbs {
             if actual[i] != expected[i] {
-                let mut s = std::string::String::new();
+                let mut s = alloc::string::String::new();
                 for j in 0..ops.num_limbs {
                     let formatted = format!("{:016x}", actual[ops.num_limbs - j - 1]);
                     s.push_str(&formatted);
                 }
-                print!("\n");
                 panic!("Actual != Expected,\nActual = {}", s);
             }
         }
@@ -1243,7 +1241,7 @@ mod tests {
 mod internal_benches {
     use super::{Limb, MAX_LIMBS};
 
-    pub const LIMBS_1: [Limb; MAX_LIMBS] = limbs![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+    pub const LIMBS_1: [Limb; MAX_LIMBS] = limbs![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
     pub const LIMBS_ALTERNATING_10: [Limb; MAX_LIMBS] = limbs![
         0b10101010_10101010_10101010_10101010,

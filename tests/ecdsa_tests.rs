@@ -15,7 +15,6 @@
 #![forbid(
     anonymous_parameters,
     box_pointers,
-    legacy_directory_ownership,
     missing_copy_implementations,
     missing_debug_implementations,
     missing_docs,
@@ -39,14 +38,12 @@ use ring::{
 
 // ECDSA *signing* tests are in src/ec/ecdsa/signing.rs.
 
-#[cfg(feature = "use_heap")]
+#[cfg(feature = "alloc")]
 #[test]
 fn ecdsa_from_pkcs8_test() {
     test::run(
         test_file!("ecdsa_from_pkcs8_tests.txt"),
         |section, test_case| {
-            use std::error::Error;
-
             assert_eq!(section, "");
 
             let curve_name = test_case.consume_string("Curve");
@@ -85,7 +82,7 @@ fn ecdsa_from_pkcs8_test() {
                 (Ok(_), None) => (),
                 (Err(e), None) => panic!("Failed with error \"{}\", but expected to succeed", e),
                 (Ok(_), Some(e)) => panic!("Succeeded, but expected error \"{}\"", e),
-                (Err(actual), Some(expected)) => assert_eq!(actual.description(), expected),
+                (Err(actual), Some(expected)) => assert_eq!(format!("{}", actual), expected),
             };
 
             match (
@@ -95,7 +92,7 @@ fn ecdsa_from_pkcs8_test() {
                 (Ok(_), None) => (),
                 (Err(e), None) => panic!("Failed with error \"{}\", but expected to succeed", e),
                 (Ok(_), Some(e)) => panic!("Succeeded, but expected error \"{}\"", e),
-                (Err(actual), Some(expected)) => assert_eq!(actual.description(), expected),
+                (Err(actual), Some(expected)) => assert_eq!(format!("{}", actual), expected),
             };
 
             assert!(signature::EcdsaKeyPair::from_pkcs8(other_fixed, &input).is_err());
@@ -125,7 +122,7 @@ fn ecdsa_generate_pkcs8_test() {
         println!();
         println!();
 
-        #[cfg(feature = "use_heap")]
+        #[cfg(feature = "alloc")]
         let _ = signature::EcdsaKeyPair::from_pkcs8(*alg, pkcs8.as_ref()).unwrap();
     }
 }
@@ -156,15 +153,6 @@ fn signature_ecdsa_verify_asn1_test() {
 
             let actual_result =
                 signature::UnparsedPublicKey::new(alg, &public_key).verify(&msg, &sig);
-            assert_eq!(actual_result.is_ok(), is_valid);
-
-            #[allow(deprecated)]
-            let actual_result = signature::verify(
-                alg,
-                untrusted::Input::from(&public_key),
-                untrusted::Input::from(&msg),
-                untrusted::Input::from(&sig),
-            );
             assert_eq!(actual_result.is_ok(), is_valid);
 
             Ok(())
@@ -199,15 +187,6 @@ fn signature_ecdsa_verify_fixed_test() {
 
             let actual_result =
                 signature::UnparsedPublicKey::new(alg, &public_key).verify(&msg, &sig);
-            assert_eq!(actual_result.is_ok(), is_valid);
-
-            #[allow(deprecated)]
-            let actual_result = signature::verify(
-                alg,
-                untrusted::Input::from(&public_key),
-                untrusted::Input::from(&msg),
-                untrusted::Input::from(&sig),
-            );
             assert_eq!(actual_result.is_ok(), is_valid);
 
             Ok(())

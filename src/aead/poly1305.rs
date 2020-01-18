@@ -19,8 +19,7 @@ use super::{
     block::{Block, BLOCK_LEN},
     Tag,
 };
-use crate::{bssl, error};
-use libc::size_t;
+use crate::{bssl, c, error};
 
 /// A Poly1305 key.
 pub struct Key([Block; KEY_BLOCKS]);
@@ -51,7 +50,7 @@ impl Context {
             fn GFp_poly1305_blocks(
                 state: &mut Opaque,
                 input: *const u8,
-                len: size_t,
+                len: c::size_t,
                 should_pad: Pad,
             );
             fn GFp_poly1305_emit(state: &mut Opaque, tag: &mut Tag, nonce: &Nonce);
@@ -137,7 +136,7 @@ struct Nonce(Block);
 #[repr(C)]
 struct Funcs {
     blocks_fn:
-        unsafe extern "C" fn(&mut Opaque, input: *const u8, input_len: size_t, should_pad: Pad),
+        unsafe extern "C" fn(&mut Opaque, input: *const u8, input_len: c::size_t, should_pad: Pad),
     emit_fn: unsafe extern "C" fn(&mut Opaque, &mut Tag, nonce: &Nonce),
 }
 
@@ -199,7 +198,8 @@ pub(super) fn sign(key: Key, input: &[u8]) -> Tag {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{polyfill::convert::*, test};
+    use crate::{polyfill::convert::Into_, test};
+    use core::convert::TryInto;
 
     #[test]
     pub fn test_state_layout() {
@@ -212,7 +212,7 @@ mod tests {
         test::run(test_file!("poly1305_test.txt"), |section, test_case| {
             assert_eq!(section, "");
             let key = test_case.consume_bytes("Key");
-            let key: &[u8; BLOCK_LEN * 2] = key.as_slice().try_into_().unwrap();
+            let key: &[u8; BLOCK_LEN * 2] = key.as_slice().try_into().unwrap();
             let key: [Block; 2] = key.into_();
             let input = test_case.consume_bytes("Input");
             let expected_mac = test_case.consume_bytes("MAC");

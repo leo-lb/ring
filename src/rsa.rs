@@ -19,6 +19,7 @@
 
 /// RSA signatures.
 use crate::{
+    arithmetic::bigint,
     bits, error,
     io::{self, der},
     limb,
@@ -42,7 +43,7 @@ const PRIVATE_KEY_PUBLIC_MODULUS_MAX_BITS: bits::BitLength = bits::BitLength::fr
 /// Parameters for RSA verification.
 #[derive(Debug)]
 pub struct RsaParameters {
-    padding_alg: &'static padding::Verification,
+    padding_alg: &'static dyn padding::Verification,
     min_bits: bits::BitLength,
 }
 
@@ -63,8 +64,8 @@ fn parse_public_key(
 #[derive(Copy, Clone)]
 pub enum N {}
 
+unsafe impl bigint::PublicModulus for N {}
+
 pub mod verification;
 
 pub mod signing;
-
-mod bigint;

@@ -12,6 +12,8 @@
 // OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 // CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+use alloc::{boxed::Box, vec::Vec};
+
 pub trait Accumulator {
     fn write_byte(&mut self, value: u8);
     fn write_bytes(&mut self, value: &[u8]);
@@ -72,6 +74,6 @@ impl Accumulator for Writer {
     }
 }
 
-pub fn write_copy(accumulator: &mut Accumulator, to_copy: untrusted::Input) {
+pub fn write_copy(accumulator: &mut dyn Accumulator, to_copy: untrusted::Input) {
     accumulator.write_bytes(to_copy.as_slice_less_safe())
 }
